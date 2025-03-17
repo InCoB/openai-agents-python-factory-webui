@@ -21,8 +21,11 @@ class AgentRole(str, Enum):
         """
         Convert UI role enum to framework role value.
         
+        Args:
             role_value: The role value from the UI enum.
             
+        Returns:
+            The corresponding framework role value.
         """
         role_map = {
             cls.RESEARCH.value: "research",
@@ -76,22 +79,40 @@ class AgentConfiguration(BaseModel):
         description="Structured output type specification"
     )
     
+    # Class variables for validation
     AGENT_TYPE_PATTERN: ClassVar[re.Pattern] = re.compile(r'^[a-z][a-z0-9_]*$')
     
-    @validator('agent_type')
-    def validate_agent_type(cls, v: str) -> str:
+    @classmethod
+    def to_framework_role(cls, role_value: str) -> str:
+        """
+        Convert UI role enum to framework role value.
+        
+        Args:
+            role_value: The role value from the UI enum.
+            
+        Returns:
+            The corresponding framework role value.
+        """
+        return AgentRole.to_framework_role(role_value)
+    
+    @staticmethod
+    def validate_agent_type(v: str) -> str:
         """
         Validate agent_type format.
         
+        Args:
             v: The agent type string to validate.
             
+        Returns:
+            The validated agent type string.
             
+        Raises:
             ValueError: If the agent_type is invalid.
         """
         if not v:
             raise ValueError("agent_type cannot be empty")
         
-        if not cls.AGENT_TYPE_PATTERN.match(v):
+        if not AgentConfiguration.AGENT_TYPE_PATTERN.match(v):
             raise ValueError(
                 "agent_type must start with a lowercase letter and contain "
                 "only lowercase letters, numbers, and underscores"

@@ -13,6 +13,14 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/yourusername/aigen",
     packages=find_packages(),
+    package_data={
+        'aigen': [
+            'templates/*.jinja',
+            'templates/*.py',
+            'templates/*.yaml',
+        ],
+    },
+    include_package_data=True,
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
@@ -27,6 +35,7 @@ setup(
         "requests>=2.25.1",
         "gradio>=4.0.0",
         "python-dotenv>=0.19.0",
+        "jinja2>=3.0.0",
     ],
     entry_points={
         "console_scripts": [

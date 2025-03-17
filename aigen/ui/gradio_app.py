@@ -1,8 +1,9 @@
 import os
 import gradio as gr
 import asyncio
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional, Union, Tuple
 import uuid
+import logging
 
 from ..core.logging import get_logger
 from ..core.context import Context
@@ -10,6 +11,8 @@ from ..core.config import ConfigManager
 from ..workflows.factory import create_workflow, workflow_registry
 from ..agents.factory import agent_registry
 from agents import trace, gen_trace_id
+from .agent_builder import AgentBuilderUI
+from .agent_manager import AgentManagerUI
 
 logger = get_logger("gradio_interface")
 
@@ -391,6 +394,76 @@ class GradioInterface:
         )
 
 
+class GradioApp:
+    """Main Gradio application."""
+    
+    def __init__(
+        self,
+        title: str = "AI Gen Framework",
+        description: str = "Generate and run AI agents"
+    ) -> None:
+        """
+        Initialize the Gradio application.
+        
+            title: Application title.
+            description: Application description.
+        """
+        self.title = title
+        self.description = description
+        
+        self.agent_builder = AgentBuilderUI()
+        self.agent_manager = AgentManagerUI()
+    
+    def build_ui(self) -> gr.Blocks:
+        """
+        Build the Gradio UI.
+        
+            Gradio Blocks application.
+        """
+        with gr.Blocks(title=self.title, theme=gr.themes.Default()) as app:
+            gr.Markdown(f"# {self.title}")
+            gr.Markdown(self.description)
+            
+            with gr.Tabs() as tabs:
+                with gr.TabItem("Use Predefined Workflow"):
+                    gr.Markdown("Content for predefined workflows")
+                
+                with gr.TabItem("Create Custom Workflow"):
+                    gr.Markdown("Content for custom workflows")
+                
+                self.agent_builder.build_ui()
+                
+                self.agent_manager.build_ui()
+                
+                with gr.TabItem("Workflow Management"):
+                    gr.Markdown("Content for workflow management")
+            
+            return app
+    
+    def launch(
+        self,
+        server_name: str = "127.0.0.1",
+        server_port: int = 7860,
+        share: bool = False,
+        **kwargs: Any
+    ) -> None:
+        """
+        Launch the Gradio application.
+        
+            server_name: Server hostname.
+            server_port: Server port.
+            share: Whether to create a public link.
+            **kwargs: Additional arguments to pass to gr.launch().
+        """
+        app = self.build_ui()
+        app.launch(
+            server_name=server_name,
+            server_port=server_port,
+            share=share,
+            **kwargs
+        )
+
+
 def launch_ui(share: bool = False, **kwargs) -> None:
     """
     Launch the Gradio UI.
@@ -403,6 +476,12 @@ def launch_ui(share: bool = False, **kwargs) -> None:
 
     _ensure_callable_factories()
 
-    interface = GradioInterface()
+    # Use GradioInterface by default for backward compatibility
+    # To use the new GradioApp, set "use_new_ui" in kwargs
+    if kwargs.pop("use_new_ui", False):
+        app = GradioApp()
+    else:
+        app = GradioInterface()
+        
     kwargs["share"] = share
-    interface.launch(**kwargs)
+    app.launch(**kwargs)
