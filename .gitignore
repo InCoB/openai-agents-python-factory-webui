@@ -2,3 +2,5 @@ __pycache__/
 venv/
 .env
 *.aigen.egg-info/
+.pylintrc
+.flake8
