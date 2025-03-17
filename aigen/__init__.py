@@ -3,6 +3,8 @@ AI Agent Framework - A modular framework for building and orchestrating AI agent
 
 This framework provides tools for creating, configuring, and executing AI agent-based
 workflows. It includes support for various agent types, tools, and workflow patterns.
+
+AI Generator Framework - Tools for generating, managing, and testing AI agents.
 """
 
 __version__ = "1.0.0"
@@ -35,6 +37,20 @@ from .workflows import (
     register_workflow_factory,
 )
 
+# Import services and UI components for Agent Generator Framework
+from . import services
+from . import ui
+
+from .ui.gradio_app import GradioApp
+from .ui.agent_builder import AgentBuilderUI
+from .ui.agent_manager import AgentManagerUI
+
+from .services.models import AgentConfiguration
+from .services.generator import AgentGeneratorService
+from .services.registration import AgentRegistrationService
+from .services.testing import AgentTestingService
+from .services.persistence import AgentPersistenceService
+
 from .agents.factory import register_standard_agents
 from .workflows.factory import register_standard_workflows
 
@@ -43,6 +59,7 @@ from .workflows.factory import workflow_registry
 from .agents.factory import agent_registry
 
 __all__ = [
+    # Core framework components
     "Context",
     "Logger",
     "ConfigManager",
@@ -65,6 +82,16 @@ __all__ = [
     "HandoffWorkflow",
     "create_workflow",
     "register_workflow_factory",
+    
+    # Generator framework components
+    "GradioApp",
+    "AgentBuilderUI",
+    "AgentManagerUI",
+    "AgentConfiguration",
+    "AgentGeneratorService",
+    "AgentRegistrationService",
+    "AgentTestingService",
+    "AgentPersistenceService"
 ]
 
 
