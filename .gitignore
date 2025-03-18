@@ -4,3 +4,15 @@ venv/
 *.aigen.egg-info/
 .pylintrc
 .flake8
+aigen/.DS_Store
+aigen/.DS_Store
+aigen/agents/.DS_Store
+aigen/agents/agents/.DS_Store
+aigen/agents/agents/agents/.DS_Store
+aigen/agents/agents/agents/agents/.DS_Store
+aigen/agents/agents/agents/agents/agents/.DS_Store
+aigen/agents/agents/agents/agents/agents/agents/.DS_Store
+aigen/agents/agents/agents/agents/agents/agents/agents/.DS_Store
+aigen/agents/agents/agents/agents/agents/agents/agents/.DS_Store
+aigen/agents/agents/agents/agents/agents/agents/agents/.DS_Store
+.gitignore
