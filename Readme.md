@@ -50,6 +50,44 @@ aigen --web --port 8080 --share
 - **research_only**: Single-agent workflow that performs research only
 - **Custom workflows**: Create your own by specifying agent combinations
 
+## Agent Builder
+
+The framework includes a powerful Agent Builder tool that allows you to create custom agents through a visual interface without writing code:
+
+### Features
+
+- **No-Code Agent Creation**: Define agents using a simple form interface
+- **Custom Instructions**: Provide specialized instructions to guide agent behavior
+- **Tool Selection**: Choose which tools your agent can access
+- **Structured Output**: Optionally define structured output formats using Pydantic models
+- **Testing Interface**: Test your agents with sample inputs before deployment
+- **Agent Management**: List, edit, and delete custom agents
+
+![Agent Builder Interface](documentation/images/agent_builder_screenshot.png)
+
+*The Agent Builder provides a user-friendly interface for creating custom agents without coding*
+
+### Usage
+
+```bash
+# Launch the Agent Builder interface
+aigen --builder
+
+# Or access it through the main web interface
+aigen --web --port 8080
+```
+
+### Integration
+
+Custom agents created with the Agent Builder are automatically registered with the framework and can be:
+
+- Used in workflows through the CLI and API
+- Selected in the web interface
+- Combined with built-in agents
+- Used as handoff targets for other agents
+
+For detailed technical documentation on the Agent Builder module, see [8. agent_builder_module.md](documentation/8.%20agent_builder_module.md).
+
 ### CLI Commands
 
 | Command | Description |
@@ -115,6 +153,35 @@ register_agent_factory(
     lambda agent_id=None, **kwargs: MyAgent(agent_id=agent_id, **kwargs),
     {"description": "My custom agent"}
 )
+```
+
+### Using Agents Created with Agent Builder
+
+Agents created with the Agent Builder are automatically registered with the factory system and can be used programmatically:
+
+```python
+from aigen.agents import create_agent
+
+# Use a custom agent created with the Agent Builder
+custom_agent = create_agent("my_custom_agent")
+
+# Execute the agent
+response = await custom_agent.execute("What's the weather in Paris?")
+print(response.content)
+
+# Use in workflows
+from aigen.workflows import DeterministicWorkflow
+
+workflow = DeterministicWorkflow(
+    agents=[
+        create_agent("research"),
+        create_agent("my_custom_agent"),  # Your Agent Builder created agent
+        create_agent("editor")
+    ],
+    name="custom_workflow"
+)
+
+result = await workflow.execute("Research quantum computing trends")
 ```
 
 ### Creating Custom Workflows
