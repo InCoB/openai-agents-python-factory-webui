@@ -108,7 +108,7 @@ class AgentConfiguration(BaseModel):
         return v
 
     @validator("name")
-    def validate_name(self, v: str) -> str:
+    def validate_name(cls, v: str) -> str:
         """
         Validate agent name.
 
@@ -122,7 +122,7 @@ class AgentConfiguration(BaseModel):
         return v
 
     @validator("instructions")
-    def validate_instructions(self, v: str) -> str:
+    def validate_instructions(cls, v: str) -> str:
         """
         Validate agent instructions.
 
@@ -136,7 +136,7 @@ class AgentConfiguration(BaseModel):
         return v
 
     @validator("role", pre=True)
-    def validate_role(self, v):
+    def validate_role(cls, v):
         """Ensure role is properly converted from string to enum."""
         if isinstance(v, str):
             try:

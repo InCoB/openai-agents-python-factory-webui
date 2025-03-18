@@ -14,6 +14,17 @@ from typing import List, Optional, Union, Dict, Any
 from pydantic import BaseModel
 {% endif %}
 
+# Import tools directly
+{% for tool_name in config.tools %}
+# Convert snake_case to module path
+{% set module_name = tool_name.split('_')[0] %}
+{% if tool_name == 'tavily_search' %}
+from aigen.tools.research import tavily_search_tool
+{% else %}
+from aigen.tools.{{ module_name }} import {{ tool_name }}_tool
+{% endif %}
+{% endfor %}
+
 logger = get_logger("{{ config.agent_type }}_agent")
 
 {% if config.output_type %}
@@ -47,11 +58,14 @@ class {{ config.name | replace(" ", "") }}Agent(AgentBase):
         if not self.instructions:
             self.instructions = """{{ config.instructions }}"""
         
-        # Initialize tools
+        # Initialize tools with direct imports
         {% for tool_name in config.tools %}
         try:
-            from aigen.tools.factory import create_tool
-            self.add_tool(create_tool("{{ tool_name }}"))
+            {% if tool_name == 'tavily_search' %}
+            self.add_tool(tavily_search_tool)
+            {% else %}
+            self.add_tool({{ tool_name }}_tool)
+            {% endif %}
         except Exception as e:
             logger.warning(f"Failed to initialize tool {{ tool_name }}: {str(e)}")
         {% endfor %}

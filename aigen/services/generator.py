@@ -155,6 +155,15 @@ from agents.model_settings import ModelSettings
 from typing import List, Optional, Union, Dict, Any
 {% endif %}
 
+# Import tools directly
+{% for tool_name in config.tools %}
+{% if tool_name == 'tavily_search' %}
+from aigen.tools.research import tavily_search_tool
+{% else %}
+from aigen.tools.{{ tool_name.split('_')[0] }} import {{ tool_name }}_tool
+{% endif %}
+{% endfor %}
+
 # Set up logger
 logger = logging.getLogger("{{ config.agent_type }}_agent")
 
@@ -205,21 +214,21 @@ class {{ config.name | replace(" ", "") }}Agent:
             **kwargs
         }
         
-        # Load tools
+        # Initialize tools directly
         self._init_tools()
     
     def _init_tools(self) -> None:
         """Initialize tools for this agent."""
-        tool_names = {{ config.tools }}
-        
-        for tool_name in tool_names:
-            try:
-                # Use the tool factory to create tools
-                from ..tools.factory import create_tool
-                tool = create_tool(tool_name)
-                self.tools.append(tool)
-            except Exception as e:
-                logger.warning(f"Failed to initialize tool {tool_name}: {str(e)}")
+        {% for tool_name in config.tools %}
+        try:
+            {% if tool_name == 'tavily_search' %}
+            self.tools.append(tavily_search_tool)
+            {% else %}
+            self.tools.append({{ tool_name }}_tool)
+            {% endif %}
+        except Exception as e:
+            logger.warning(f"Failed to initialize tool {{ tool_name }}: {str(e)}")
+        {% endfor %}
     
     def is_initialized(self) -> bool:
         """
