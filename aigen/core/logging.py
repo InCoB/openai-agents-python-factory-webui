@@ -96,6 +96,7 @@ class Logger:
             Structures log data for machine readability and easy integration
             with log processing tools.
             """
+
             def format(self, record):
                 log_data = {
                     "timestamp": datetime.fromtimestamp(record.created).isoformat(),

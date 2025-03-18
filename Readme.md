@@ -5,7 +5,7 @@ AIgen is a production-ready implementation of an AI agent orchestration framewor
 ## Features
 
 - **Ready-to-use AI Agents**: Includes research, writer, editor, and strategy agents
-- **Flexible Workflows**: Deterministic (sequential) and Handoff (dynamic) workflow patterns
+- **Flexible Workflows**: Deterministic (sequential) and Handoff (dynamic) workflow patterns // handoff must be tested more properly//
 - **Extensible Architecture**: Registry-based component system for adding custom agents and tools
 - **Multiple Interfaces**: CLI, Web UI (Gradio), and Programmatic API
 - **Robust Error Handling**: Built-in retry mechanisms and error classification

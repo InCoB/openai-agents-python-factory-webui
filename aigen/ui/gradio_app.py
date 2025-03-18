@@ -18,16 +18,13 @@ class BaseGradioUI:
     Base class for Gradio UI implementations with shared functionality.
     Provides common methods for accessing workflows and agents.
     """
-    
+
     def __init__(
-        self,
-        title: str,
-        description: str,
-        config: Optional[ConfigManager] = None
+        self, title: str, description: str, config: Optional[ConfigManager] = None
     ):
         """
         Initialize the base Gradio UI.
-        
+
         Args:
             title: Application title
             description: Application description
@@ -36,11 +33,11 @@ class BaseGradioUI:
         self.title = title
         self.description = description
         self.config = config or ConfigManager()
-        
+
         # Initialize workflow data
         self.available_workflows = self._get_available_workflows()
         self.available_agents = self._get_available_agents()
-    
+
     def _get_available_workflows(self) -> Dict[str, Dict[str, Any]]:
         """Get available workflow templates."""
         workflows = {}
@@ -73,9 +70,7 @@ class BaseGradioUI:
         # Only show concrete workflow instances to users
         base_workflow_types = ["handoff", "deterministic"]
         filtered_workflows = [
-            name
-            for name in self.available_workflows
-            if name not in base_workflow_types
+            name for name in self.available_workflows if name not in base_workflow_types
         ]
 
         # Don't include "custom" in the dropdown - we'll use a separate tab for that
@@ -84,14 +79,14 @@ class BaseGradioUI:
     def _get_agent_choices(self) -> List[str]:
         """Get agent choices for dropdown."""
         return list(self.available_agents.keys())
-        
+
     def _get_workflow_agents(self, workflow_name: str) -> List[str]:
         """
         Get the agents belonging to a workflow.
-        
+
         Args:
             workflow_name: Name of the workflow to get agents for
-            
+
         Returns:
             List of agent IDs in the workflow
         """
@@ -112,12 +107,14 @@ class BaseGradioUI:
                         if hasattr(temp_workflow, "agents"):
                             return [agent.agent_id for agent in temp_workflow.agents]
                     except (TypeError, AttributeError, ValueError) as e:
-                        logger.debug(f"Error accessing workflow agents from factory: {e}")
+                        logger.debug(
+                            f"Error accessing workflow agents from factory: {e}"
+                        )
             except KeyError as e:
                 logger.debug(f"Error retrieving workflow from registry: {e}")
 
         return workflow_agents.get(workflow_name, [])
-        
+
     async def run_workflow(
         self,
         workflow_name: str,
@@ -188,20 +185,20 @@ class BaseGradioUI:
                     result_content = str(result_content)
                 elif result_content is None:
                     result_content = "No result returned"
-                    
+
                 # Always include trace info for better user experience
                 trace_info = f"\n\n---\nTrace ID: {workflow_id}\nTrace URL: {trace_url}"
                 return str(result_content) + trace_info
             else:
                 error_msg = str(result.get("error", "Unknown error"))
-                
+
                 # Ensure partial result is a string
                 partial_result = result.get("result", "")
                 if isinstance(partial_result, dict):
                     partial_result = str(partial_result)
                 elif partial_result is None:
                     partial_result = "No partial result available"
-                    
+
                 return f"Workflow failed: {error_msg}\n\n{partial_result}\n\nTrace ID: {workflow_id}"
 
         except Exception as e:
@@ -229,7 +226,7 @@ class GradioInterface(BaseGradioUI):
             Build and execute workflows with specialized AI agents. Create custom agent combinations 
             for research, content generation, analysis, and more.
             """,
-            config=config
+            config=config,
         )
 
     def update_agent_selection(self, workflow_name: str) -> List[str]:
@@ -278,8 +275,12 @@ class GradioInterface(BaseGradioUI):
                     # Configuration section
                     gr.Markdown("## Workflow Configuration")
                     workflow_choices = self._get_workflow_choices()
-                    default_workflow = "content_generation" if "content_generation" in workflow_choices else None
-                    
+                    default_workflow = (
+                        "content_generation"
+                        if "content_generation" in workflow_choices
+                        else None
+                    )
+
                     workflow_name = gr.Dropdown(
                         choices=workflow_choices,
                         value=default_workflow,
@@ -288,8 +289,12 @@ class GradioInterface(BaseGradioUI):
                     )
 
                     # Display the agents in the selected workflow
-                    initial_agents_info = f"Workflow contains: {', '.join(self._get_workflow_agents(default_workflow))}" if default_workflow else "Please select a workflow"
-                    
+                    initial_agents_info = (
+                        f"Workflow contains: {', '.join(self._get_workflow_agents(default_workflow))}"
+                        if default_workflow
+                        else "Please select a workflow"
+                    )
+
                     workflow_agents_info = gr.Textbox(
                         value=initial_agents_info,
                         label="Selected Agents",
@@ -393,7 +398,7 @@ class GradioInterface(BaseGradioUI):
                 if not wf:
                     return "Please select a workflow"
                 return f"Workflow contains: {', '.join(self._get_workflow_agents(wf))}"
-                
+
             # Update workflow agent info when workflow changes
             workflow_name.change(
                 fn=update_workflow_agents_info,
@@ -450,31 +455,31 @@ class GradioInterface(BaseGradioUI):
 
 class GradioApp(BaseGradioUI):
     """Main Gradio application with extended functionality."""
-    
+
     def __init__(
         self,
         title: str = "AI Gen Framework",
         description: str = "Generate and run AI agents",
-        config: Optional[ConfigManager] = None
+        config: Optional[ConfigManager] = None,
     ) -> None:
         """
         Initialize the Gradio application.
-        
+
         Args:
             title: Application title.
             description: Application description.
             config: Optional configuration manager.
         """
         super().__init__(title, description, config)
-        
+
         # Initialize UI components
         self.agent_builder = AgentBuilderUI()
         self.agent_manager = AgentManagerUI()
-    
+
     def build_ui(self) -> gr.Blocks:
         """
         Build the Gradio UI.
-        
+
         Returns:
             Gradio Blocks application.
         """
@@ -492,7 +497,7 @@ class GradioApp(BaseGradioUI):
         ) as app:
             gr.Markdown(f"# {self.title}")
             gr.Markdown(self.description)
-            
+
             with gr.Tabs() as tabs:
                 # Predefined workflow tab
                 with gr.TabItem("Use Predefined Workflow"):
@@ -508,8 +513,12 @@ class GradioApp(BaseGradioUI):
                     gr.Markdown("## Workflow Configuration")
                     # Define workflow_name first before referencing it
                     workflow_choices = self._get_workflow_choices()
-                    default_workflow = "content_generation" if "content_generation" in workflow_choices else None
-                    
+                    default_workflow = (
+                        "content_generation"
+                        if "content_generation" in workflow_choices
+                        else None
+                    )
+
                     workflow_name = gr.Dropdown(
                         choices=workflow_choices,
                         value=default_workflow,
@@ -518,8 +527,12 @@ class GradioApp(BaseGradioUI):
                     )
 
                     # Display the agents in the selected workflow
-                    initial_agents_info = f"Workflow contains: {', '.join(self._get_workflow_agents(default_workflow))}" if default_workflow else "Please select a workflow"
-                    
+                    initial_agents_info = (
+                        f"Workflow contains: {', '.join(self._get_workflow_agents(default_workflow))}"
+                        if default_workflow
+                        else "Please select a workflow"
+                    )
+
                     workflow_agents_info = gr.Textbox(
                         value=initial_agents_info,
                         label="Selected Agents",
@@ -593,13 +606,13 @@ class GradioApp(BaseGradioUI):
                     # Output for custom workflow
                     gr.Markdown("## Output")
                     custom_output_text = gr.Textbox(label="Result", lines=20)
-                
+
                 # Agent Builder tab
                 self.agent_builder.build_ui()
-                
+
                 # Agent Manager tab
                 self.agent_manager.build_ui()
-                
+
                 # Workflow Management tab
                 with gr.TabItem("Workflow Management"):
                     gr.Markdown("## Available Workflows")
@@ -621,7 +634,7 @@ class GradioApp(BaseGradioUI):
                         headers=["Name", "Description"],
                         label="Agents",
                     )
-            
+
             # Event handlers
             # Define a function for the workflow_name.change event instead of using a lambda
             def update_workflow_agents_info(wf: str) -> str:
@@ -629,7 +642,7 @@ class GradioApp(BaseGradioUI):
                 if not wf:
                     return "Please select a workflow"
                 return f"Workflow contains: {', '.join(self._get_workflow_agents(wf))}"
-                
+
             # Update workflow agent info when workflow changes
             workflow_name.change(
                 fn=update_workflow_agents_info,
@@ -660,19 +673,19 @@ class GradioApp(BaseGradioUI):
                 ],
                 outputs=[custom_output_text],
             )
-            
+
         return app
-    
+
     def launch(
         self,
         server_name: str = "127.0.0.1",
         server_port: int = 7860,
         share: bool = False,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> None:
         """
         Launch the Gradio app.
-        
+
         Args:
             server_name: Hostname to run the server on
             server_port: Port to run the server on
@@ -688,14 +701,14 @@ class GradioApp(BaseGradioUI):
             favicon_path=None,
             show_api=False,
             inbrowser=True,
-            **kwargs
+            **kwargs,
         )
 
 
 def launch_ui(share: bool = False, **kwargs) -> None:
     """
     Launch the Gradio UI.
-    
+
     Args:
         share: Whether to create a publicly shareable link
         **kwargs: Additional parameters for gr.launch()
@@ -709,8 +722,8 @@ def launch_ui(share: bool = False, **kwargs) -> None:
     app = GradioApp(
         title=kwargs.pop("title", "AI Generator Framework"),
         description=kwargs.pop("description", "Generate and run AI agents"),
-        config=kwargs.pop("config", None)
+        config=kwargs.pop("config", None),
     )
-        
+
     kwargs["share"] = share
     app.launch(**kwargs)

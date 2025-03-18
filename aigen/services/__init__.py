@@ -12,5 +12,5 @@ __all__ = [
     "AgentGeneratorService",
     "AgentRegistrationService",
     "AgentTestingService",
-    "AgentPersistenceService"
+    "AgentPersistenceService",
 ]

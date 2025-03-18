@@ -343,7 +343,9 @@ async def main_cli() -> int:
         "--title", default="AI Generator Framework", help="Application title"
     )
     web_parser.add_argument(
-        "--description", default="Create and manage custom AI agents", help="Application description"
+        "--description",
+        default="Create and manage custom AI agents",
+        help="Application description",
     )
 
     parser.add_argument("--config", help="Path to configuration file")
@@ -370,27 +372,31 @@ async def main_cli() -> int:
             return await list_components_command(args)
         elif args.command == "web":
             from .gradio_app import launch_ui
-            
+
             # Resolve port conflicts
             port = args.port
             if port:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                     if s.connect_ex((args.host, port)) == 0:
                         # Port is in use, find an available one
-                        logger.warning(f"Port {port} is already in use, finding an available port")
+                        logger.warning(
+                            f"Port {port} is already in use, finding an available port"
+                        )
                         for p in range(port, port + 100):
-                            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s2:
+                            with socket.socket(
+                                socket.AF_INET, socket.SOCK_STREAM
+                            ) as s2:
                                 if s2.connect_ex((args.host, p)) != 0:
                                     port = p
                                     logger.info(f"Using port {port} instead")
                                     break
-            
+
             launch_ui(
-                share=args.share, 
-                server_name=args.host, 
+                share=args.share,
+                server_name=args.host,
                 server_port=port,
                 title=args.title,
-                description=args.description
+                description=args.description,
             )
             return 0
         else:

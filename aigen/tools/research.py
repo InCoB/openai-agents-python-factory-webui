@@ -209,9 +209,6 @@ class TavilySearchTool(ToolBase):
                     )
 
 
-tavily_tool_instance = TavilySearchTool()
-
-
 @function_tool
 async def tavily_search_tool(query: str, results_count: int) -> Dict[str, Any]:
     """
@@ -224,7 +221,7 @@ async def tavily_search_tool(query: str, results_count: int) -> Dict[str, Any]:
     if results_count is None:
         results_count = 3
 
-    response = await tavily_tool_instance.execute(
-        query=query, results_count=results_count
-    )
+    # Create a new instance each time instead of using global instance
+    tavily_tool = TavilySearchTool()
+    response = await tavily_tool.execute(query=query, results_count=results_count)
     return response.data

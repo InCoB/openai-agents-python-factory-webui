@@ -82,7 +82,6 @@ __all__ = [
     "HandoffWorkflow",
     "create_workflow",
     "register_workflow_factory",
-    
     # Generator framework components
     "GradioApp",
     "AgentBuilderUI",
@@ -91,7 +90,7 @@ __all__ = [
     "AgentGeneratorService",
     "AgentRegistrationService",
     "AgentTestingService",
-    "AgentPersistenceService"
+    "AgentPersistenceService",
 ]
 
 

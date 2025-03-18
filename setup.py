@@ -14,10 +14,10 @@ setup(
     url="https://github.com/yourusername/aigen",
     packages=find_packages(),
     package_data={
-        'aigen': [
-            'templates/*.jinja',
-            'templates/*.py',
-            'templates/*.yaml',
+        "aigen": [
+            "templates/*.jinja",
+            "templates/*.py",
+            "templates/*.yaml",
         ],
     },
     include_package_data=True,

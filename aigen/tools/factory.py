@@ -74,11 +74,33 @@ def create_tool(tool_type: str, tool_id: Optional[str] = None, **kwargs) -> Tool
 
 
 def register_standard_tools():
-    """Register standard tool types with the registry."""
+    """Register all standard tools."""
+
+    # Check if tavily_search is already registered to prevent duplication
+    if "tavily_search" not in tool_registry.list():
+        # Explicitly register the Tavily search tool with proper factory function
+        try:
+            from aigen.tools.research import TavilySearchTool
+
+            register_tool_factory(
+                "tavily_search",
+                lambda tool_id=None, **kwargs: TavilySearchTool(
+                    tool_id=tool_id or "tavily_search", **kwargs
+                ),
+                {"description": "Search the web using Tavily API"},
+            )
+            logger.info(f"Registered tool factory: tavily_search")
+        except ImportError:
+            logger.debug("Tavily search tool not available")
+        except Exception as e:
+            logger.warning(f"Error registering Tavily search tool: {str(e)}")
+
+    # Rest of standard tools registration
     standard_tools = [
-        ("tavily_search", "TavilySearchTool"),
+        # List without tavily since we registered it explicitly
         ("content_analysis", "ContentAnalysisTool"),
         ("readability", "ReadabilityTool"),
+        # Add other standard tools here
     ]
 
     for tool_type, class_name in standard_tools:

@@ -15,4 +15,9 @@ aigen/agents/agents/agents/agents/agents/agents/.DS_Store
 aigen/agents/agents/agents/agents/agents/agents/agents/.DS_Store
 aigen/agents/agents/agents/agents/agents/agents/agents/.DS_Store
 aigen/agents/agents/agents/agents/agents/agents/agents/.DS_Store
+.cursorrules
 .gitignore
+aigen/agents/custom/*
+!aigen/agents/custom/.gitkeep
+aigen/agents/config/*
+!aigen/agents/config/.gitkeep

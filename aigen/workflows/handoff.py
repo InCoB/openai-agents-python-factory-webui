@@ -84,13 +84,13 @@ class HandoffWorkflow:
         # Add the workflow name to the metadata
         if hasattr(context.get_metadata(), "add_workflow"):
             context.get_metadata().add_workflow(self.name)
-        
+
         # Execute the first agent in the chain
         current_agent_idx = 0
         final_response = None
-        
+
         # [Execute each agent and handle handoffs]
-        
+
         # Calculate and log total execution time
         execution_time = time.time() - start_time
         logger.info(f"Handoff workflow completed in {execution_time:.2f} seconds")
