@@ -40,18 +40,23 @@ async def main() -> int:
 
     # Load configuration from the specified file
     config = ConfigManager(args.config)
-    
+
     # Initialize the framework with the loaded configuration
     aigen.init()
-    
+
     try:
         if args.web:
             logger.info(f"Launching web interface with config from {args.config}")
-            launch_ui(share=args.share, server_port=args.port, server_name=args.host, config=config)
+            launch_ui(
+                share=args.share,
+                server_port=args.port,
+                server_name=args.host,
+                config=config,
+            )
             return 0
         elif args.cli:
             logger.info(f"Launching CLI with config from {args.config}")
-            return await main_cli(config=config)
+            return await main_cli()
         else:
             logger.info("No interface specified, launching web interface")
             launch_ui(share=args.share, server_port=args.port, server_name=args.host)

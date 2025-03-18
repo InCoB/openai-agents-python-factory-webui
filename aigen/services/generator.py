@@ -2,8 +2,7 @@
 
 import os
 import logging
-from pathlib import Path
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Tuple
 
 from jinja2 import Environment, FileSystemLoader, exceptions
 
@@ -11,13 +10,14 @@ from aigen.services.models import AgentConfiguration
 
 logger = logging.getLogger(__name__)
 
+
 class AgentGeneratorService:
     """Service for generating agent code from configurations."""
-    
+
     def __init__(self, template_dir: Optional[str] = None) -> None:
         """
         Initialize the generator service.
-        
+
         Args:
             template_dir: Path to template directory. If None, uses default templates.
         """
@@ -25,58 +25,57 @@ class AgentGeneratorService:
         if template_dir is None:
             # Use package directory + 'templates'
             template_dir = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                'templates'
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "templates"
             )
-        
+
         self.template_dir = template_dir
-        
+
         # Ensure template directory exists
         os.makedirs(template_dir, exist_ok=True)
-        
+
         # Create default templates if they don't exist
         self._ensure_default_templates()
-        
+
         # Set up Jinja environment
         self.env = Environment(
             loader=FileSystemLoader(template_dir),
             trim_blocks=True,
             lstrip_blocks=True,
-            keep_trailing_newline=True
+            keep_trailing_newline=True,
         )
-    
+
     def _ensure_default_templates(self) -> None:
         """
         Ensure default templates exist.
-        
+
         Checks if template files exist and creates them with fallback content if they don't.
         """
         # Define template files to check
         template_files = {
             "agent_class.py.jinja": self._get_agent_class_template_fallback,
-            "agent_config.yaml.jinja": self._get_agent_config_template_fallback
+            "agent_config.yaml.jinja": self._get_agent_config_template_fallback,
         }
-        
+
         # Check each template file
         for filename, fallback_func in template_files.items():
             file_path = os.path.join(self.template_dir, filename)
             if not os.path.exists(file_path):
                 # Create the directory if it doesn't exist
                 os.makedirs(os.path.dirname(file_path), exist_ok=True)
-                
+
                 # Write the template content using the fallback function
                 with open(file_path, "w") as f:
                     f.write(fallback_func())
-                    
-                logger.info(f"Created default template file: {file_path}")
-    
+
+                logger.info("Created default template file: %s", file_path)
+
     def generate_agent_code(self, config: AgentConfiguration) -> Tuple[bool, str]:
         """
         Generate Python code for an agent class.
-        
+
         Args:
             config: Agent configuration.
-            
+
         Returns:
             Tuple containing:
                 - Success flag (True if generation succeeded)
@@ -85,32 +84,32 @@ class AgentGeneratorService:
         try:
             # Get the template
             template = self.env.get_template("agent_class.py.jinja")
-            
+
             # Render the template
             code = template.render(
                 config=config,
-                framework_role=AgentConfiguration.to_framework_role(config.role.value)
+                framework_role=AgentConfiguration.to_framework_role(config.role.value),
             )
-            
+
             return True, code
-            
+
         except (exceptions.TemplateError, exceptions.TemplateNotFound) as e:
             error_msg = f"Template error: {str(e)}"
             logger.error(error_msg)
             return False, f"# Error generating code: {error_msg}"
-        
+
         except Exception as e:
             error_msg = f"Error generating agent code: {str(e)}"
             logger.error(error_msg)
             return False, f"# Error generating code: {error_msg}"
-    
+
     def generate_yaml_config(self, config: AgentConfiguration) -> Tuple[bool, str]:
         """
         Generate YAML configuration for an agent.
-        
+
         Args:
             config: Agent configuration.
-            
+
         Returns:
             Tuple containing:
                 - Success flag (True if generation succeeded)
@@ -119,29 +118,29 @@ class AgentGeneratorService:
         try:
             # Get the template
             template = self.env.get_template("agent_config.yaml.jinja")
-            
+
             # Render the template
             yaml_config = template.render(
                 config=config,
-                framework_role=AgentConfiguration.to_framework_role(config.role.value)
+                framework_role=AgentConfiguration.to_framework_role(config.role.value),
             )
-            
+
             return True, yaml_config
-            
+
         except (exceptions.TemplateError, exceptions.TemplateNotFound) as e:
             error_msg = f"Template error: {str(e)}"
             logger.error(error_msg)
             return False, f"# Error generating YAML: {error_msg}"
-        
+
         except Exception as e:
             error_msg = f"Error generating YAML config: {str(e)}"
             logger.error(error_msg)
             return False, f"# Error generating YAML: {error_msg}"
-    
+
     def _get_agent_class_template_fallback(self) -> str:
         """
         Fallback template for agent class if the file doesn't exist.
-        
+
         Returns:
             Default agent class template content as a string.
         """
@@ -337,16 +336,16 @@ class {{ config.name | replace(" ", "") }}Agent:
                 }
             }
 '''
-    
+
     def _get_agent_config_template_fallback(self) -> str:
         """
         Fallback template for agent config if the file doesn't exist.
-        
+
         Returns:
             Default agent config template content as a string.
         """
         # This is only used if the template file doesn't exist
-        return '''# Agent Configuration for {{ config.name }}
+        return """# Agent Configuration for {{ config.name }}
 agent_type: {{ config.agent_type }}
 name: {{ config.name }}
 role: {{ framework_role }}
@@ -370,4 +369,4 @@ handoffs:
 output_type: |
   {{ config.output_type | indent(2) }}
 {% endif %}
-'''
+"""
