@@ -2,7 +2,7 @@
 
 import re
 from enum import Enum
-from typing import Dict, Any, List, Optional, ClassVar
+from typing import Dict, Any, List, Optional, ClassVar, Union
 
 from pydantic import BaseModel, Field, validator
 
@@ -48,11 +48,11 @@ class AgentConfiguration(BaseModel):
     )
     name: str = Field(
         ..., 
-        description="Display name for the agent"
+        description="Human-readable name for this agent"
     )
-    role: AgentRole = Field(
-        AgentRole.CUSTOM, 
-        description="Agent's functional role"
+    role: Union[AgentRole, str] = Field(
+        ...,
+        description="Role of this agent in workflows"
     )
     instructions: str = Field(
         ..., 
@@ -148,9 +148,20 @@ class AgentConfiguration(BaseModel):
             raise ValueError("instructions cannot be empty")
         return v
     
+    @validator('role', pre=True)
+    def validate_role(cls, v):
+        """Ensure role is properly converted from string to enum."""
+        if isinstance(v, str):
+            try:
+                return AgentRole(v)
+            except ValueError:
+                # If not a valid enum value, default to CUSTOM
+                return AgentRole.CUSTOM
+        return v
+    
     class Config:
         """Configuration for the model."""
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "agent_type": "financial_analyst",
                 "name": "Financial Analysis Agent",

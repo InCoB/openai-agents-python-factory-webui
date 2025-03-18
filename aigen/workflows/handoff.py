@@ -81,8 +81,9 @@ class HandoffWorkflow:
         else:
             logger.debug(f"Using provided trace ID: {trace_id}")
 
-        # Initialize the context with workflow execution metadata
-        context.get_metadata().add_workflow(self.name)
+        # Add the workflow name to the metadata
+        if hasattr(context.get_metadata(), "add_workflow"):
+            context.get_metadata().add_workflow(self.name)
         
         # Execute the first agent in the chain
         current_agent_idx = 0

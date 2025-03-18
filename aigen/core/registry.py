@@ -9,6 +9,7 @@ instantiation.
 
 from typing import Dict, Any, Type, TypeVar, Generic, Callable, Optional, List
 import inspect
+import logging
 
 T = TypeVar("T")
 
@@ -35,6 +36,7 @@ class Registry(Generic[T]):
         self._factories: Dict[str, Callable[..., T]] = {}
         self._component_type = component_type
         self._metadata: Dict[str, Dict[str, Any]] = {}
+        self._logger = logging.getLogger(f"registry.{component_type.__name__}") 
 
     def register(
         self, name: str, component: T, metadata: Optional[Dict[str, Any]] = None

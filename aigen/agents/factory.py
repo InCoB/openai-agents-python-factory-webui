@@ -1,5 +1,8 @@
 from typing import Dict, Any, Callable, Optional, List, Type
 import importlib
+import os
+import inspect
+import sys
 
 from .base import AgentBase, AgentRole
 from ..core.registry import Registry
@@ -24,6 +27,78 @@ def register_agent_factory(
     """
     agent_registry.register_factory(name, factory, metadata)
     logger.info(f"Registered agent factory: {name}")
+
+
+def register_agents_in_directory(directory: str) -> None:
+    """
+    Auto-register all agent classes found in Python files in the specified directory.
+    
+        directory: Path to directory containing agent files
+    """
+    # Get absolute path
+    directory = os.path.abspath(directory)
+    
+    # Skip if directory doesn't exist
+    if not os.path.exists(directory) or not os.path.isdir(directory):
+        logger.warning(f"Directory {directory} does not exist or is not a directory")
+        return
+    
+    # Find all Python files (excluding __init__.py)
+    python_files = [
+        f for f in os.listdir(directory) 
+        if f.endswith('.py') and not f.startswith('__')
+    ]
+    
+    for filename in python_files:
+        try:
+            # Extract potential agent type from filename
+            agent_type = filename.replace('.py', '').lower()
+            
+            # Skip already registered agents
+            if agent_type in agent_registry.list():
+                continue
+                
+            # Construct module path
+            rel_path = os.path.relpath(directory, os.path.dirname(os.path.dirname(__file__)))
+            module_path = f"aigen.{rel_path.replace(os.path.sep, '.')}.{agent_type}"
+            
+            # Import the module
+            try:
+                module = importlib.import_module(module_path)
+            except ImportError as e:
+                logger.debug(f"Could not import {module_path}: {str(e)}")
+                continue
+            
+            # Find any class ending with "Agent"
+            agent_classes = {}
+            for name, obj in module.__dict__.items():
+                if name.endswith('Agent') and inspect.isclass(obj):
+                    agent_classes[name] = obj
+            
+            if not agent_classes:
+                logger.debug(f"No agent classes found in {filename}")
+                continue
+                
+            # Register each agent class
+            for class_name, agent_class in agent_classes.items():
+                # Create a factory function
+                def make_factory(agent_cls, agent_name):
+                    def factory(agent_id=None, **kwargs):
+                        return agent_cls(agent_id=agent_id or agent_name, **kwargs)
+                    return factory
+                
+                # Register with the registry
+                register_agent_factory(
+                    agent_type,
+                    make_factory(agent_class, agent_type),
+                    {"description": f"Agent defined in {filename}"}
+                )
+                
+                logger.info(f"Auto-registered agent: {agent_type} ({class_name})")
+                
+        except Exception as e:
+            logger.warning(f"Error auto-registering agent {filename}: {str(e)}")
+            continue
 
 
 def create_agent(
@@ -66,6 +141,11 @@ def create_agent(
 
                 logger.info(f"Creating strategy agent {agent_id} directly")
                 return StrategyAgent(agent_id=agent_id, **kwargs)
+            elif agent_type == "test":
+                from .test import testAgent
+
+                logger.info(f"Creating test agent {agent_id} directly")
+                return testAgent(agent_id=agent_id, **kwargs)
         except ImportError:
             logger.debug(
                 f"Could not create agent {agent_type} directly, trying registry"
@@ -92,20 +172,33 @@ def create_agent(
         # Try dynamic import as a last resort
         logger.debug(f"No usable factory for {agent_type}, trying dynamic import")
 
+        # First try direct module import
         module_path = f"aigen.agents.{agent_type.lower()}"
+        try:
+            module = importlib.import_module(module_path)
+            logger.debug(f"Found module at {module_path}")
+        except ImportError:
+            # If not found, try from custom directory
+            module_path = f"aigen.agents.custom.{agent_type.lower()}"
+            try:
+                module = importlib.import_module(module_path)
+                logger.debug(f"Found module in custom directory: {module_path}")
+            except ImportError:
+                raise KeyError(f"No agent implementation found for type: {agent_type}")
+
         class_name = (
             "".join(word.capitalize() for word in agent_type.split("_")) + "Agent"
         )
 
-        try:
-            module = importlib.import_module(module_path)
-        except ImportError:
-            raise KeyError(f"No agent implementation found for type: {agent_type}")
-
         if not hasattr(module, class_name):
-            raise KeyError(
-                f"Agent module {module_path} does not contain class {class_name}"
-            )
+            # Try lowercase class name (e.g., testAgent instead of TestAgent)
+            alt_class_name = agent_type.lower() + "Agent"
+            if hasattr(module, alt_class_name):
+                class_name = alt_class_name
+            else:
+                raise KeyError(
+                    f"Agent module {module_path} does not contain class {class_name}"
+                )
 
         agent_class = getattr(module, class_name)
 
@@ -158,6 +251,15 @@ def register_standard_agents():
             ),
             "Strategy agent that develops content plans and outlines",
         ),
+        (
+            "test",
+            lambda agent_id=None, **kwargs: (
+                __import__(
+                    "aigen.agents.test", fromlist=["testAgent"]
+                ).testAgent(agent_id=agent_id or "test", **kwargs)
+            ),
+            "Test agent for system testing",
+        ),
     ]
 
     # Register each factory
@@ -172,4 +274,16 @@ def register_standard_agents():
             continue
 
 
+def auto_register_all_agents():
+    """Register all agents found in standard directories."""
+    # Register agents in the main agents directory
+    agents_dir = os.path.dirname(os.path.abspath(__file__))
+    register_agents_in_directory(agents_dir)
+    
+    # Register agents in the custom subdirectory
+    custom_dir = os.path.join(agents_dir, "custom")
+    register_agents_in_directory(custom_dir)
+
+# Register standard agents first, then auto-register any others
 register_standard_agents()
+auto_register_all_agents()

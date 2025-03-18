@@ -132,7 +132,7 @@ class WorkflowEngine:
         # Get progress callback if available
         progress_callback = None
         if hasattr(context, "get_metadata"):
-            progress_callback = context.get_metadata("progress_callback")
+            progress_callback = context.get_user_metadata("progress_callback")
 
         # Track which agent is currently being executed for progress reporting
         active_agents = self.active_workflows.get(

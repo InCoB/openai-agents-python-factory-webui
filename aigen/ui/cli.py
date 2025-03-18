@@ -5,6 +5,7 @@ import os
 from typing import Dict, Any, List, Optional, Union
 from pathlib import Path
 import json
+import socket
 
 from ..core.logging import get_logger, configure_logging
 from ..core.config import ConfigManager
@@ -334,9 +335,15 @@ async def main_cli() -> int:
 
     web_parser = subparsers.add_parser("web", help="Launch web interface")
     web_parser.add_argument("--port", type=int, default=7860, help="Port to listen on")
-    web_parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
+    web_parser.add_argument("--host", default="127.0.0.1", help="Host to bind to")
     web_parser.add_argument(
         "--share", action="store_true", help="Create a publicly shareable link"
+    )
+    web_parser.add_argument(
+        "--title", default="AI Generator Framework", help="Application title"
+    )
+    web_parser.add_argument(
+        "--description", default="Create and manage custom AI agents", help="Application description"
     )
 
     parser.add_argument("--config", help="Path to configuration file")
@@ -363,8 +370,28 @@ async def main_cli() -> int:
             return await list_components_command(args)
         elif args.command == "web":
             from .gradio_app import launch_ui
-
-            launch_ui(share=args.share)
+            
+            # Resolve port conflicts
+            port = args.port
+            if port:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    if s.connect_ex((args.host, port)) == 0:
+                        # Port is in use, find an available one
+                        logger.warning(f"Port {port} is already in use, finding an available port")
+                        for p in range(port, port + 100):
+                            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s2:
+                                if s2.connect_ex((args.host, p)) != 0:
+                                    port = p
+                                    logger.info(f"Using port {port} instead")
+                                    break
+            
+            launch_ui(
+                share=args.share, 
+                server_name=args.host, 
+                server_port=port,
+                title=args.title,
+                description=args.description
+            )
             return 0
         else:
             parser.print_help()

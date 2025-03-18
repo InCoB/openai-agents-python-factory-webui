@@ -1604,6 +1604,99 @@ async def execute_search(query: str, max_results: int = 5) -> Dict[str, Any]:
 
 These improvements ensure that all workflow types (including single-agent workflows) work correctly in both programmatic and web UI contexts.
 
+### 13.6 UI Component Type Mismatches with Gradio
+
+When working with the Gradio-based UI, you may encounter errors related to component type mismatches. These typically occur when a function returns a data type incompatible with the UI component it's connected to.
+
+#### Common Error: Dictionaries Passed to Markdown Components
+
+A frequent error occurs when a dictionary is passed to a Gradio Markdown component, which expects a string:
+
+```
+Error: Cannot convert dict to str implicitly
+```
+
+This often happens after refactoring functions to return more structured data (dictionaries) while the UI components remain configured for string outputs.
+
+#### Solution 1: Use Appropriate Component Types
+
+Match your component types to your function return types:
+
+```python
+# INCORRECT - Will cause error if function returns a dictionary
+result_display = gr.Markdown()
+
+# CORRECT - Use JSON component for dictionary return types
+result_display = gr.JSON()
+```
+
+#### Solution 2: Use Adapter Functions
+
+Add adapter functions that convert between types:
+
+```python
+def dict_to_string_adapter(func):
+    """Adapter to convert dictionary outputs to strings for Markdown components."""
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        result = await func(*args, **kwargs)
+        
+        if isinstance(result, dict):
+            # Format dictionary nicely for display
+            if "status" in result and "message" in result:
+                return result["message"]
+            return str(result)
+        return result
+    return wrapper
+
+# Then use it in your UI setup:
+btn.click(
+    dict_to_string_adapter(my_func),
+    inputs=[...],
+    outputs=[result_markdown]
+)
+```
+
+#### Solution 3: Move Shared Adapter Functions to Utilities
+
+For frequently used adapter functions, place them in a shared utilities module:
+
+```python
+# In aigen/ui/utils.py
+import inspect
+from functools import wraps
+from typing import Any, Callable, Dict
+
+def dict_to_string_adapter(func: Callable) -> Callable:
+    """Adapter to convert dictionary outputs to strings for Markdown components."""
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        if inspect.iscoroutinefunction(func):
+            result = await func(*args, **kwargs)
+        else:
+            result = func(*args, **kwargs)
+            
+        if isinstance(result, dict):
+            if "status" in result and "message" in result:
+                return result["message"]
+            return str(result)
+        return result
+    return wrapper
+
+# Then import it where needed:
+from aigen.ui.utils import dict_to_string_adapter
+```
+
+#### Best Practice: Consistency in Return Types
+
+To prevent these issues:
+- Design UI functions to have consistent return types
+- Document expected return types for all UI-connected functions
+- Use typing annotations to make return types explicit
+- When refactoring, review all UI component connections
+- Consider using more flexible components like HTML or JSON instead of Markdown
+- Test UI changes thoroughly before deployment
+
 ## 14. Advanced Component Creation and Registration
 
 ### 14.1 Factory System Architecture
@@ -2375,3 +2468,166 @@ class AnalyticsPlugin(AIgenPlugin):
 ```
 
 By leveraging these extension points, you can adapt the framework to meet specific needs without modifying its core implementation.
+
+## 10. Troubleshooting
+
+### 10.1 Custom Agent Issues
+
+The agent system supports both built-in agents and custom agents. Custom agents can be created through the Agent Builder UI or by manually creating Python files. Here are solutions to common issues:
+
+#### 10.1.1 Agent Not Found Issues
+
+If your custom agent isn't being found by the system, check the following:
+
+1. **Location**: Agents should be placed in either:
+   - Main agents directory: `aigen/agents/*.py`
+   - Custom agents directory: `aigen/agents/custom/*.py`
+
+2. **Module Structure**: Ensure both directories have an `__init__.py` file to make them proper Python packages.
+
+3. **Class Naming**: The agent class should follow either:
+   - PascalCase: `TestAgent` (automatically detected)
+   - camelCase: `testAgent` (automatically detected as fallback)
+
+#### 10.1.2 Import Errors
+
+Custom agents must use absolute imports rather than relative ones:
+
+```python
+# CORRECT - Use absolute imports
+from aigen.agents.base import AgentBase, AgentRole, AgentResponse
+from aigen.core.context import Context
+from aigen.core.errors import AgentError
+
+# INCORRECT - Don't use relative imports 
+from .base import AgentBase  # This will fail in custom subdirectories
+```
+
+#### 10.1.3 Interface Compatibility
+
+All agents must:
+
+1. **Inherit from AgentBase**:
+   ```python
+   class MyCustomAgent(AgentBase):
+       # Implementation
+   ```
+
+2. **Implement the correct method signatures**:
+   ```python
+   async def execute(
+       self, 
+       context: Context,  # Must accept Context object first
+       input_text: Optional[str] = None  # Input text is optional second param
+   ) -> AgentResponse:  # Must return AgentResponse object
+       # Implementation
+   ```
+
+3. **Handle context correctly**:
+   ```python
+   # Get input from context if not provided directly
+   if input_text is None:
+       input_text = context.get_latest_output() or "No input provided"
+       
+   # Store results in context
+   context.store_output(self.agent_id, result)
+   ```
+
+4. **Return properly structured responses**:
+   ```python
+   return AgentResponse(
+       content=result,
+       agent_id=self.agent_id,
+       success=True,
+       metadata={"role": "custom"}
+   )
+   ```
+
+#### 10.1.4 Agent Builder Generated Code
+
+When using the Agent Builder to create custom agents:
+
+1. The system generates code in the `aigen/agents/custom/` directory
+2. The agent is automatically registered with the factory
+3. The generated agent follows the correct interface pattern
+
+If you encounter issues with a generated agent:
+- Check the logs for specific error messages
+- Verify that the agent was successfully registered by looking for "Registered agent factory: [name]" in logs
+- If needed, manually edit the agent code to fix any issues
+
+#### 10.1.5 Agent Factory System
+
+The agent factory system uses multiple strategies to find and instantiate agents:
+
+1. **Direct instantiation** for built-in agents
+2. **Factory functions** for registered agents 
+3. **Dynamic import** as a fallback, which:
+   - First checks in main agents directory
+   - Then checks in custom agents directory
+   - Tries both PascalCase and camelCase class names
+
+If you're having trouble with agent registration:
+```python
+from aigen.agents.factory import register_agent_factory
+
+# Register with a factory function
+register_agent_factory(
+    "my_agent",  # Agent type ID
+    lambda agent_id=None, **kwargs: MyAgent(agent_id=agent_id or "my_agent", **kwargs),
+    {"description": "My custom agent"}  # Optional metadata
+)
+```
+
+##### Common Warning: "Factory for [agent_name] is not callable"
+
+If you see a warning like:
+```
+[12:08:33] ⚠️ WARNING: Factory for agent_22 is not callable, trying dynamic import
+```
+
+This indicates that:
+
+1. The system found a registered factory for the agent, but it's not a callable function
+2. This typically happens when an agent instance (object) was registered instead of a factory function
+3. The system will fall back to dynamic import, which might still work but is less efficient
+
+To fix this issue:
+
+*No action is required** when you see this warning. The system will automatically attempt to:
+1. Use dynamic import to find the appropriate agent module
+2. Instantiate the agent class directly
+3. Continue normal operation without interruption.
+4. This is a known issue. However, you can move your custom agent to the agents folder and update it following examples of other agents.
+
+
+
+#### 10.1.6 Runner Context Issues
+
+When using the OpenAI Agents SDK Runner:
+```python
+# CORRECT: Don't pass the Context object directly to Runner
+response = await Runner.run(
+    self.openai_agent,
+    input=input_text,
+    context=None,  # Don't use our Context object here
+    max_turns=self.parameters.get("max_turns", 10)
+)
+```
+
+### 10.2 Other Common Issues
+
+#### 10.2.1 Context Class Metadata
+
+The `Context` class provides two methods for handling metadata:
+
+```python
+# Use get_metadata() to get the execution metadata object
+metadata = context.get_metadata()  # Returns ExecutionMetadata object
+
+# Use set_metadata() and get_user_metadata() for custom metadata
+context.set_metadata("key", value)  # Set custom metadata
+value = context.get_user_metadata("key")  # Get custom metadata
+```
+
+These methods must not be confused with each other.

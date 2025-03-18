@@ -88,8 +88,9 @@ class AgentRegistrationService:
                 - Result message
         """
         module_name = f"aigen.agents.custom.{config.agent_type}"
+        file_name = f"{config.agent_type}.py"
         class_name = f"{config.name.replace(' ', '')}Agent"
-        module_path = os.path.join(self.agents_dir, f"{config.agent_type}.py")
+        module_path = os.path.join(self.agents_dir, file_name)
         
         try:
             try:
@@ -108,6 +109,11 @@ class AgentRegistrationService:
             
             with open(module_path, "w") as f:
                 f.write(code)
+            
+            init_path = os.path.join(self.agents_dir, "__init__.py")
+            if not os.path.exists(init_path):
+                with open(init_path, "w") as f:
+                    f.write("# Auto-generated custom agents\n")
             
             spec = importlib.util.spec_from_file_location(module_name, module_path)
             if not spec or not spec.loader:

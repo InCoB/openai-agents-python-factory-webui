@@ -3,7 +3,10 @@
 import asyncio
 import logging
 import re
-from typing import List, Dict, Any, Optional, Tuple, Callable, Generator
+import json
+import inspect
+from functools import wraps
+from typing import List, Dict, Any, Optional, Tuple, Callable, Generator, AsyncGenerator
 
 import gradio as gr
 
@@ -12,6 +15,9 @@ from aigen.services.generator import AgentGeneratorService
 from aigen.services.registration import AgentRegistrationService
 from aigen.services.testing import AgentTestingService
 from aigen.services.persistence import AgentPersistenceService
+from aigen.ui.utils import dict_to_string_adapter
+from aigen.core.context import Context
+from aigen.agents import factory
 
 logger = logging.getLogger(__name__)
 
@@ -203,7 +209,7 @@ class AgentBuilderUI:
         use_output_type: bool, 
         output_type_code: str, 
         code: str
-    ) -> Generator[str, None, None]:
+    ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         Register agent with the framework.
         
@@ -223,28 +229,28 @@ class AgentBuilderUI:
             Status messages during registration.
         """
         try:
-            yield "⏳ Validating inputs..."
+            yield {"status": "progress", "message": "⏳ Validating inputs..."}
             
             valid, error = self.validate_agent_type(agent_type)
             if not valid:
-                yield f"❌ {error}"
+                yield {"status": "error", "message": f"❌ {error}"}
                 return
                 
             valid, error = self.validate_name(name)
             if not valid:
-                yield f"❌ {error}"
+                yield {"status": "error", "message": f"❌ {error}"}
                 return
                 
             valid, error = self.validate_instructions(instructions)
             if not valid:
-                yield f"❌ {error}"
+                yield {"status": "error", "message": f"❌ {error}"}
                 return
                 
             if not code or code.startswith("# Error"):
-                yield "❌ Invalid code. Please generate valid code first."
+                yield {"status": "error", "message": "❌ Invalid code. Please generate valid code first."}
                 return
             
-            yield "⏳ Creating agent configuration..."
+            yield {"status": "progress", "message": "⏳ Creating agent configuration..."}
             
             config = AgentConfiguration(
                 agent_type=agent_type,
@@ -261,61 +267,74 @@ class AgentBuilderUI:
                 output_type=output_type_code if use_output_type else None
             )
             
-            yield "⏳ Registering agent..."
+            yield {"status": "progress", "message": "⏳ Registering agent..."}
             
             success, message = self.registrar.register_agent_type(config, code)
             
             if not success:
-                yield f"❌ Registration failed: {message}"
+                yield {"status": "error", "message": f"❌ Registration failed: {message}"}
                 return
             
-            yield "⏳ Saving configuration..."
+            yield {"status": "progress", "message": "⏳ Saving configuration..."}
             
             success, message = self.persistence.save_agent_config(config)
             
             if not success:
-                yield f"⚠️ Agent registered but configuration could not be saved: {message}"
+                yield {"status": "warning", "message": f"⚠️ Agent registered but configuration could not be saved: {message}"}
                 return
             
-            yield f"✅ Agent '{name}' ({agent_type}) registered successfully!"
+            yield {"status": "success", "message": f"✅ Agent '{name}' ({agent_type}) registered successfully!"}
             
         except Exception as e:
             error_msg = f"Error registering agent: {str(e)}"
             logger.error(error_msg)
-            yield f"❌ {error_msg}"
+            yield {"status": "error", "message": f"❌ {error_msg}"}
     
     async def test_agent(
-        self, 
-        agent_type: str, 
-        test_input: str
-    ) -> str:
-        """
-        Test the agent with given input.
+        self,
+        agent_type: str,
+        agent_name: str,
+        agent_instructions: str,
+        test_input: str,
+    ) -> Dict[str, Any]:
+        """Test the agent by creating it with the given parameters and running it with a test prompt."""
+        logger.debug(f"Testing agent: type={agent_type}, name={agent_name}")
         
-            agent_type: Agent type to test.
-            test_input: Test input text.
-            
-            Test result message.
-        """
         try:
-            if not agent_type:
-                return "❌ Missing agent type. Please generate and register an agent first."
-                
-            if not test_input:
-                return "❌ Missing test input. Please provide input text to test the agent."
+            # Create context
+            context = Context()
+            context.store_output("system", test_input or "Please respond to this test message with a brief introduction of yourself.")
             
-            result = await self.tester.test_agent(agent_type, test_input)
+            # Create agent
+            logger.debug(f"Creating agent with factory.create_agent({agent_type}, {agent_name})")
+            agent = factory.create_agent(
+                agent_type=agent_type,
+                agent_id=agent_name,
+                instructions=agent_instructions
+            )
             
-            if not result.get("success", False):
-                error = result.get("error", "Unknown error")
-                return f"❌ Test failed: {error}"
+            # Initialize and execute
+            logger.debug(f"Initializing agent {agent_name}")
+            await agent.initialize()
             
-            return f"✅ TEST RESULT:\n\n{result.get('content', 'No content returned')}"
+            logger.debug(f"Executing agent {agent_name}")
+            response = await agent.execute(context)
             
+            # Return results
+            logger.debug(f"Agent execution complete: {response}")
+            return {
+                "status": "success",
+                "message": f"Agent test completed successfully!",
+                "content": response.content,
+                "agent_id": response.agent_id,
+                "metadata": response.metadata
+            }
         except Exception as e:
-            error_msg = f"Error testing agent: {str(e)}"
-            logger.error(error_msg)
-            return f"❌ {error_msg}"
+            logger.error(f"Error testing agent: {str(e)}", exc_info=True)
+            return {
+                "status": "error",
+                "message": f"Error testing agent: {str(e)}"
+            }
     
     def build_ui(self) -> gr.Tab:
         """
@@ -338,7 +357,7 @@ class AgentBuilderUI:
                         placeholder="e.g., financial_analyst",
                         info="Unique identifier (lowercase, underscores)"
                     )
-                    agent_type_validation = gr.Markdown(visible=False)
+                    agent_type_validation = gr.HTML(visible=False)
                 
                 with gr.Column(scale=2):
                     agent_name = gr.Textbox(
@@ -346,7 +365,7 @@ class AgentBuilderUI:
                         placeholder="e.g., Financial Analysis Agent",
                         info="Human-readable name"
                     )
-                    name_validation = gr.Markdown(visible=False)
+                    name_validation = gr.HTML(visible=False)
             
             with gr.Row():
                 with gr.Column(scale=1):
@@ -377,7 +396,7 @@ class AgentBuilderUI:
                 placeholder="You are a specialized agent that...",
                 info="Detailed instructions for the agent's behavior"
             )
-            instructions_validation = gr.Markdown(visible=False)
+            instructions_validation = gr.HTML(visible=False)
             
             with gr.Accordion("Parameters", open=False):
                 with gr.Row():
@@ -446,13 +465,11 @@ class AgentBuilderUI:
                     lines=3
                 )
                 
-                test_output = gr.Textbox(
+                test_output = gr.JSON(
                     label="Test Output",
-                    lines=8,
-                    interactive=False
                 )
             
-            registration_result = gr.Markdown(label="Registration Result")
+            registration_result = gr.JSON(label="Registration Result")
             
             def on_agent_type_change(agent_type: str) -> Dict[str, Any]:
                 valid, message = self.validate_agent_type(agent_type)
@@ -527,7 +544,7 @@ class AgentBuilderUI:
             )
             
             register_btn.click(
-                self.register_agent,
+                dict_to_string_adapter(self.register_agent),
                 inputs=[
                     agent_type, agent_name, agent_role, agent_model, instructions,
                     temperature, max_tokens, tools, handoffs, use_output_type, 
@@ -537,8 +554,8 @@ class AgentBuilderUI:
             )
             
             test_btn.click(
-                self.test_agent,
-                inputs=[agent_type, test_input],
+                dict_to_string_adapter(self.test_agent),
+                inputs=[agent_type, agent_name, instructions, test_input],
                 outputs=[test_output]
             )
             

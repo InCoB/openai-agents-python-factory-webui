@@ -227,7 +227,8 @@ def configure_logging(level: str = "INFO", log_file: Optional[str] = None) -> No
         level: Log level to set
         log_file: Optional file to log to
     """
-    logger.set_level(level)
+    # Force INFO level to disable debug logs
+    logger.set_level("INFO")
 
     if log_file:
-        logger.add_file_handler(log_file, level)
+        logger.add_file_handler(log_file, "INFO")

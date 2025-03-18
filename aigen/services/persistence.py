@@ -6,9 +6,31 @@ import shutil
 import logging
 from typing import List, Optional, Dict, Any, Tuple
 
-from aigen.services.models import AgentConfiguration
+from aigen.services.models import AgentConfiguration, AgentRole
 
 logger = logging.getLogger(__name__)
+
+# Configure YAML to handle AgentRole enum properly
+class SafeAgentYamlLoader(yaml.SafeLoader):
+    """Custom YAML loader that handles AgentRole enums."""
+    pass
+
+def agent_role_constructor(loader, node):
+    """Convert YAML scalar to AgentRole enum."""
+    value = loader.construct_scalar(node)
+    try:
+        return AgentRole(value)
+    except ValueError:
+        logger.warning(f"Invalid AgentRole value: {value}, defaulting to CUSTOM")
+        return AgentRole.CUSTOM
+
+# Register constructor for role values
+SafeAgentYamlLoader.add_constructor('tag:yaml.org,2002:str', lambda loader, node: loader.construct_scalar(node))
+yaml.add_representer(AgentRole, lambda dumper, data: dumper.represent_scalar('tag:yaml.org,2002:str', data.value))
+
+# Also handle old-style Python object serialization 
+yaml_tag = 'tag:yaml.org,2002:python/object/apply:aigen.services.models.AgentRole'
+SafeAgentYamlLoader.add_constructor(yaml_tag, lambda loader, node: AgentRole.CUSTOM)
 
 class AgentPersistenceService:
     """Service for persisting and loading agent configurations."""
@@ -85,13 +107,38 @@ class AgentPersistenceService:
             if not os.path.exists(file_path):
                 return False, None, f"Configuration for {agent_type} not found"
             
-            with open(file_path, "r") as f:
-                config_dict = yaml.safe_load(f)
-            
-            config = AgentConfiguration(**config_dict)
-            
-            return True, config, f"Successfully loaded configuration for {agent_type}"
-            
+            try:
+                with open(file_path, "r") as f:
+                    # Use our custom loader that handles AgentRole
+                    config_dict = yaml.load(f, Loader=SafeAgentYamlLoader)
+                
+                config = AgentConfiguration(**config_dict)
+                
+                return True, config, f"Successfully loaded configuration for {agent_type}"
+            except Exception as e:
+                logger.error(f"Error loading agent configuration: {str(e)}")
+                # Try a backup approach - manually fix the role if it's the issue
+                try:
+                    with open(file_path, "r") as f:
+                        config_dict = yaml.safe_load(f)
+                    
+                    # Handle role specially
+                    if 'role' in config_dict:
+                        if isinstance(config_dict['role'], dict):
+                            # Likely a Python object serialization object
+                            config_dict['role'] = AgentRole.CUSTOM
+                        elif isinstance(config_dict['role'], str):
+                            try:
+                                config_dict['role'] = AgentRole(config_dict['role'])
+                            except ValueError:
+                                config_dict['role'] = AgentRole.CUSTOM
+                    
+                    config = AgentConfiguration(**config_dict)
+                    return True, config, f"Successfully loaded configuration for {agent_type} (fixed role)"
+                except Exception as backup_e:
+                    logger.error(f"Backup loading approach also failed: {str(backup_e)}")
+                    return False, None, f"Error loading agent configuration: {str(e)}, backup error: {str(backup_e)}"
+        
         except Exception as e:
             error_msg = f"Error loading agent configuration: {str(e)}"
             logger.error(error_msg)
@@ -145,11 +192,12 @@ class AgentPersistenceService:
                         success, config, _ = self.load_agent_config(agent_type)
                         
                         if success and config:
+                            # Ensure all values are strings
                             result.append({
-                                "agent_type": agent_type,
-                                "name": config.name,
-                                "role": config.role.value,
-                                "model": config.model
+                                "agent_type": str(agent_type),
+                                "name": str(config.name),
+                                "role": str(config.role.value if hasattr(config.role, "value") else config.role),
+                                "model": str(config.model)
                             })
                     except Exception as e:
                         logger.warning(f"Failed to load {filename}: {str(e)}")
